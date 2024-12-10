@@ -10,9 +10,15 @@ This guide provides detailed instructions for setting up, managing, and troubles
    - [Toolforge](#toolforge)
         - [Starting, Stopping, and Restarting Services](#starting-stopping-and-restarting-services)
         - [Monitoring and Logs](#monitoring-and-logs)
-        - [Some useful commands](#some-useful-commands)
+        - [Some useful toolforge commands](#some-useful-toolforge-commands)
    - [Cloud VPS](#cloud-vps)
+        - [Starting, Stopping, and Restarting Instances](#starting-stopping-and-restarting-instances)
+        - [Monitoring](#monitoring)
+        - [Some useful commands](#some-useful-commands)
 3. [Troubleshooting](#troubleshooting)
+    - [Web Server Issues](#web-server-issues)
+    - [Database Issues](#database-issues)
+    - [Data Dumps and Recovery](#data-dumps-and-recovery)
 4. [More Resources](#more-resources)
 
 
@@ -75,10 +81,10 @@ This guide provides detailed instructions for setting up, managing, and troubles
 - **Check server status**: `webservice status`
 
 #### Monitoring and Logs
-- View Kubernetes namespace status:  [Tool Namespace Status](https://k8s-status.toolforge.org/namespaces/tool-wikiedudashboard/)
-- View pod details:  [Tool Pod Details](https://k8s-status.toolforge.org/namespaces/tool-wikiedudashboard/pods/)
+- [Kubernetes Namespace Details](https://k8s-status.toolforge.org/namespaces/tool-wikiedudashboard/)
+- [Kubernetes Pod Details](https://k8s-status.toolforge.org/namespaces/tool-wikiedudashboard/pods/wikiedudashboard-5954f86c86-pm8d5/)
 
-#### Some useful Commands
+#### Some useful toolforge commands
 - Check recent logs: `toolforge webservice logs -l 100`
 - Follow logs in real time: `toolforge webservice logs -f`
 - List active jobs: `toolforge jobs list`
@@ -88,9 +94,63 @@ This guide provides detailed instructions for setting up, managing, and troubles
 
 ### Cloud VPS
 
+#### Starting, Stopping, and Restarting Instances
+- **Start instance**: `openstack server start <id>`
+- **Stop instance**: `webservice stop`
+- **Restart instance**: `openstack server reboot <id>`
+- **Check status of all instances (ACTIVE, SHUTOFF, PAUSED)**: `openstack server list --host hostname --all-projects`
+
+#### Monitoring
+- [Grafana](https://grafana.wmcloud.org/d/0g9N-7pVz/cloud-vps-project-board?orgId=1&var-project=globaleducation)
+- [Server Admin Logs (SAL)](https://sal.toolforge.org/globaleducation)
+- [Alerts](https://prometheus-alerts.wmcloud.org/?q=%40state%3Dactive&q=project%3Dglobaleducation)
+- [Puppet agent logs for the globaleducation project](https://grafana.wmcloud.org/d/SQM7MJZSz/cloud-vps-puppet-agents?orgId=1&var-project=globaleducation&from=now-2d&to=now) 
+
+
+#### Some useful commands
+- Check memory: `free -m`
+- Check processor(s): `cat /proc/cpuinfo  | grep ^processor`
+- Check status of systemd unit: `systemctl status <unit_name>`
+- Check logs of systemd unit: `journalctl -u <unit_name> -n 1000`
+- Check all cinder services and logs: `sudo systemctl status cinder* -l`
+- Check cinder backup list for available volumes: `openstack volume backup list | grep -iv available`
+- List all available flavors of instances: `sudo wmcs-openstack flavor list`
+- Check the current status of an instance: `OS_PROJECT_ID=PROJECT-ID sudo wmcs-openstack server show SERVER-ID`
+- Resize an instance to a new flavor using ID: `OS_PROJECT_ID=PROJECT-ID sudo wmcs-openstack server resize --flavor FLAVOR-ID SERVER-ID`
+- Show messages about Openstack APIs being up or down: `$ sudo tail /var/log/haproxy/haproxy.log`
+
+
 ## Troubleshooting
+
+### Web Server Issues
+- **Internal Server Error**: Restart the web server.  
+- **Unresponsive Web Service**:  
+  - Usually caused by high-activity events or surges in ongoing activity, leading to system overload.  
+    - **Solution**: Reboot the VM (instance) running the web server.  
+    - The web service typically recovers within a few hours.  
+
+### Database Issues
+- **Full Disk**: Free up space by deleting temporary tables.  
+- **High-Edit / Long Courses Causing Errors**:  
+  - Consider turning off the 'long' and 'very_long_update' queues.   
+- **Stuck Transactions**: If results in the Rails server becoming unresponsive, restart MySQL.  
+- **Database Errors**:  
+  - Verify that the app and database server versions are compatible.  
+
+### Data Dumps and Recovery
+- **Performing a Dump for a table**:  
+  1. Put the database in `innodb_force_recovery=1` mode. 
+        - Note: `OPTIMIZE TABLE revisions;` cannot run in recovery mode because the database is read-only.  
+  2. Start the dump process.  
+  3. Once the dump is complete, drop the table.  
+  4. Remove the database from recovery mode and restore the table.  
+
+### Third-Party Dependencies
+Issues could also be caused by maintenance or outages in third-party dependencies such as Openstack, Toolforge, or other services.
 
 
 ## More Resources
 - [Toolforge Documentation](https://wikitech.wikimedia.org/wiki/Help:Toolforge)
 - [Cloud VPS Documentation](https://wikitech.wikimedia.org/wiki/Help:Cloud_VPS)
+- [Cloud VPS Admin Documentation](https://wikitech.wikimedia.org/wiki/Portal:Cloud_VPS/Admin)
+- [Details of most recent P&E server update](https://github.com/WikiEducationFoundation/WikiEduDashboard/commit/df271f1c54fd0520e42445fcc88f19b6d03a603b#diff-f8eaa8feeef99c2b098e875ccdace93998b84eeb4110dc9f49b1327df7d96e21)
